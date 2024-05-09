@@ -1,8 +1,8 @@
-import { downloadTorrent } from './tcpclient.js';
+import { downloadTorrent } from './client.js';
 import { existsSync } from 'fs';
 import { parseMagnetLink, Torrent } from './bencodeparser.js';
-import downloadFile from './torrent_file.js';
-import downloadMagnet from './magnet_link.js';
+import downloadFile from './webt/torrent_file.js';
+import downloadMagnet from './webt/magnet_link.js';
 
 const arg: string = process.argv[2];
 
@@ -19,6 +19,8 @@ switch (arg) {
 		const link: string = process.argv[3];
 		if (link.startsWith('magnet')) {
 			downloadMagnet(link);
+			// const torrent: Torrent = parseMagnetLink(link);
+			// downloadTorrent(torrent);
 		}
 		else throw new Error('Invalid magnet link provided');
 		break;
