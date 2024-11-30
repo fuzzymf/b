@@ -16,7 +16,7 @@
   "scripts": {
     "test": "test",
     "build": "tsc",
-    "bdown": "node dist/index.js",
+    "b": "node dist/index.js",
     "dev": "tsc -w"
   },
   "author": "Anubhab Patnaik",
