@@ -1,5 +1,5 @@
 import { existsSync } from 'fs';
-import { parseMagnetLink } from './bencodeparser.js';
+import { parseMagnetLink } from './parser.js';
 import { Torrent } from './torrent.js';
 
 const arg: string = process.argv[2];
