@@ -1,7 +1,8 @@
 import { Torrent } from './torrent.js';
+import { Bencode } from './bencode.js';
 
 /**
- * A simple regex-based magnet link parser that 
+ * A regex-based magnet link parser that 
  * parses a magnet URI and returns a Torrent object.
  * @param sourcelink The magnet link to parse.
  * @returns The Torrent object.
@@ -52,6 +53,57 @@ export function parseMagnetLink(sourcelink: string): Torrent {
     console.log("displayName: " + displayName);
     console.log("size: " + size);
     console.log("trackers: " + announceList);
-    return new Torrent(infoHash, displayName, size, announce, announceList, urlList);
+    const torrent = new Torrent(infoHash, displayName, size, announce, announceList, urlList);
+
+    // torrent.initializePieces(metadata.info);
+    return torrent;
 }
-// "magnet:?xt=urn:btih:247EB3694D3E3E4A8879F1C4B85A33D1876283B0&dn=Ratiborus+KMS+Tools+v01.06.2021+%28Activate+Windows+and+MS+Office%29&tr=http%3A%2F%2Fp4p.arenabg.com%3A1337%2Fannounce&tr=udp%3A%2F%2F47.ip-51-68-199.eu%3A6969%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2780%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2710%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2730%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2920%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Fopentracker.i2p.rocks%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.cyberia.is%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.dler.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=udp%3A%2F%2Ftracker.pirateparty.gr%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.tiny-vps.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce"
+
+/**
+ * A bencode parser that
+ * parses a torrent file and returns a Torrent object.
+ * @param rawData The raw data parsed as a string.
+ * @returns The Torrent object.
+ * @throws An error if the torrent file is invalid.
+ */
+export function parseTorrentFile(rawData: Buffer): Torrent {
+    const bencode = new Bencode(rawData);
+    const metadata = bencode.rawData;
+
+    if (!metadata.info) {
+        throw new Error("Invalid torrent file: missing 'info' dictionary");
+    }
+
+    const infoHash = bencode.createHash(metadata.info);
+
+    const displayName = (metadata.info.name instanceof Buffer) ? metadata.info.name.toString('utf-8') : "Unknown";
+
+    // Handle multi-file torrents
+    let size: number | undefined = undefined;
+    if (metadata.info.files && Array.isArray(metadata.info.files)) {
+        size = metadata.info.files.reduce((acc: number, file: any) => acc + (file.length || 0), 0);
+    } else {
+        size = metadata.info.length;
+    }
+
+    const announce = metadata.announce ? (metadata.announce instanceof Buffer ? metadata.announce.toString('utf-8') : "Unknown") : undefined;
+    const announceList = metadata['announce-list']
+        ? metadata['announce-list'].map((tier: any[]) => tier.map((url: Buffer) => url.toString('utf-8'))).flat()
+        : [];
+    const urlList = metadata['url-list']
+        ? (Array.isArray(metadata['url-list']) ? metadata['url-list'].map((url: Buffer) => url.toString('utf-8')) : [(metadata['url-list'] instanceof Buffer ? metadata['url-list'].toString('utf-8') : "")])
+        : [];
+
+    console.log("infoHash:", infoHash);
+    console.log("displayName:", displayName);
+    console.log("size:", size);
+    console.log("announce:", announce);
+    console.log("announceList:", announceList);
+    console.log("urlList:", urlList);
+
+    const torrent = new Torrent(infoHash, displayName, size, announce, announceList, urlList);
+
+    // Additional initialization can be done here, e.g., initializing pieces
+
+    return torrent;
+}
