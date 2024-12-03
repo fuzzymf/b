@@ -12,7 +12,7 @@ interface Source {
 	speed: number; // Estimated download speed
 	availability: number; // Number of available sources
 }
-
+// Todo: Implement Kademlia
 /**
  * Efficiently downloads torrent pieces by ranking sources based on availability and speed.
  * @param torrent The Torrent object containing pieces and sources.
