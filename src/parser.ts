@@ -20,40 +20,56 @@ export function parseMagnetLink(sourcelink: string): Torrent {
 
     // Extract the display name from the magnet link
     // The name of the torrent
-    const displayNameMatch = sourcelink.match(/dn=([^&]+)/);
-    const displayName = displayNameMatch ? decodeURIComponent(displayNameMatch[1]) : "Unknown";
+    const displayNameMatch: RegExpMatchArray | null
+        = sourcelink.match(/dn=([^&]+)/);
+    const displayName: string | undefined
+        = displayNameMatch ? decodeURIComponent(displayNameMatch[1]) : undefined;
 
     // Extract the announce URL from the magnet link
     // The primary tracker for the torrent
     // The tracker contains the IP address and port number of the server that coordinates the file distribution
-    const announceMatch = sourcelink.match(/tr=([^&]+)/);
-    const announce = announceMatch ? decodeURIComponent(announceMatch[1]) : undefined;
+    const announceMatch: RegExpMatchArray | null
+        = sourcelink.match(/tr=([^&]+)/);
+    const announce: string | undefined
+        = announceMatch ? decodeURIComponent(announceMatch[1]) : undefined;
 
     // Extract the announce list from the magnet link
     // A list of backup trackers for the torrent
     // If the primary tracker fails, the client can use one of the backup trackers to find peers
     // The client can use these trackers to find peers/seeders for the torrent
     // Peers are other clients that are downloading/uploading the same torrent
-    const announceListMatch = sourcelink.match(/tr=([^&]+)/g);
-    const announceList = announceListMatch ? announceListMatch.map((match) => decodeURIComponent(match.substr(3))) : undefined;
+    const announceListMatch: RegExpMatchArray | null
+        = sourcelink.match(/tr=([^&]+)/g);
+    const announceList: string[] = announceListMatch ? announceListMatch.map((match) => decodeURIComponent(match.substr(3))) : [];
 
     // Extract the size of the torrent from the magnet link
     // The size of the torrent in bytes
-    const sizeMatch = sourcelink.match(/xl=([^&]+)/);
-    const size = sizeMatch ? parseInt(sizeMatch[1]) : undefined;
+    const sizeMatch: RegExpMatchArray | null = sourcelink.match(/xl=([^&]+)/);
+    const size: number | undefined = sizeMatch ? parseInt(sizeMatch[1]) : undefined;
 
     // Extract the URL list of the torrent from the magnet link
-    // A list of web seeds or peer sources for the torrent
-    // The client can use these URLs to download the torrent from a web server or another peer
+    // A list of web seeds for the torrent 
+    // The client can use these URLs to download the torrent from a web server 
     // This provides an alternative to downloading from peers and can help improve download speed and reliability, especially when there are few peers available.
-    const urlListMatch = sourcelink.match(/ws=([^&]+)/);
-    const urlList = urlListMatch ? [decodeURIComponent(urlListMatch[1])] : undefined;
+    const urlListMatch: RegExpMatchArray | null
+        = sourcelink.match(/ws=([^&]+)/);
+    const urlList: string[] = urlListMatch ? [decodeURIComponent(urlListMatch[1])] : [];
 
-    console.log("infoHash: " + infoHash);
-    console.log("displayName: " + displayName);
-    console.log("size: " + size);
-    console.log("trackers: " + announceList);
-    const torrent = new Torrent(infoHash, displayName, size, announce, announceList, urlList);
+
+    // Get the metadata from the magnet link
+    // Use DHT to find peers if no tracker is available and
+    // Create a info dictionary with the extracted information
+    // TODO
+
+    // Create a new Torrent object with the extracted information
+
+    console.log("infoHash: ", infoHash);
+    console.log("displayName: ", displayName);
+    console.log("size: ", size);
+    console.log("announce: ", announce);
+    console.log("announceList: ", announceList);
+    console.log("urlList: ", urlList);
+    const torrent: Torrent = new Torrent(infoHash, displayName || "Unknown", size, announce, announceList, urlList);
 
     // torrent.initializePieces(metadata.info);
     return torrent;
@@ -67,18 +83,25 @@ export function parseMagnetLink(sourcelink: string): Torrent {
  * @throws An error if the torrent file is invalid.
  */
 export function parseTorrentFile(rawData: Buffer): Torrent {
+    // A torrent file is encoded in bencode format
+    // Bencode is a simple encoding format used by BitTorrent and is 
+    // composed of dictionaries, lists, integers, and byte strings
     const bencode = new Bencode(rawData);
+    // metadata is the top-level dictionary in the torrent file
+
     const metadata = bencode.rawData;
 
     if (!metadata.info) {
         throw new Error("Invalid torrent file: missing 'info' dictionary");
     }
 
+    // The info hash is a SHA-1 hash of the 'info' dictionary in the torrent file
     const infoHash = bencode.createHash(metadata.info);
 
     const displayName = (metadata.info.name instanceof Buffer) ? metadata.info.name.toString('utf-8') : "Unknown";
 
     // Handle multi-file torrents
+    // The size of the torrent is the sum of the sizes of all files in the torrent
     let size: number | undefined = undefined;
     if (metadata.info.files && Array.isArray(metadata.info.files)) {
         size = metadata.info.files.reduce((acc: number, file: any) => acc + (file.length || 0), 0);
@@ -86,13 +109,35 @@ export function parseTorrentFile(rawData: Buffer): Torrent {
         size = metadata.info.length;
     }
 
-    const announce = metadata.announce ? (metadata.announce instanceof Buffer ? metadata.announce.toString('utf-8') : "Unknown") : undefined;
-    const announceList = metadata['announce-list']
-        ? metadata['announce-list'].map((tier: any[]) => tier.map((url: Buffer) => url.toString('utf-8'))).flat()
-        : [];
-    const urlList = metadata['url-list']
-        ? (Array.isArray(metadata['url-list']) ? metadata['url-list'].map((url: Buffer) => url.toString('utf-8')) : [(metadata['url-list'] instanceof Buffer ? metadata['url-list'].toString('utf-8') : "")])
-        : [];
+    //build the info object
+    const info: Buffer = metadata.info;
+
+
+    // Extract the announce URL from the magnet link
+    // The primary tracker for the torrent
+    // The tracker contains the IP address and port number of the server that coordinates the file distribution
+    const announce: string
+        = metadata.announce ? (metadata.announce instanceof Buffer ? metadata.announce.toString('utf-8') : "Unknown") : undefined;
+
+    // Extract the announce list from the magnet link
+    // A list of backup trackers for the torrent
+    // If the primary tracker fails, the client can use one of the backup trackers to find peers
+    // The client can use these trackers to find peers/seeders for the torrent
+    // Peers are other clients that are downloading/uploading the same torrent
+    const announceList: string[]
+        = metadata['announce-list']
+            ? metadata['announce-list'].map((tier: any[]) => tier.map((url: Buffer) => url.toString('utf-8'))).flat()
+            : [];
+
+
+    // Extract the URL list of the torrent from the torrent file
+    // A list of web seeds for the torrent 
+    // The client can use these URLs to download the torrent from a web server 
+    // This provides an alternative to downloading from peers and can help improve download speed and reliability, especially when there are few peers available.
+    const urlList: string[]
+        = metadata['url-list']
+            ? (Array.isArray(metadata['url-list']) ? metadata['url-list'].map((url: Buffer) => url.toString('utf-8')) : [(metadata['url-list'] instanceof Buffer ? metadata['url-list'].toString('utf-8') : "")])
+            : [];
 
     console.log("infoHash:", infoHash);
     console.log("displayName:", displayName);
@@ -101,9 +146,7 @@ export function parseTorrentFile(rawData: Buffer): Torrent {
     console.log("announceList:", announceList);
     console.log("urlList:", urlList);
 
-    const torrent = new Torrent(infoHash, displayName, size, announce, announceList, urlList);
-
-    // Additional initialization can be done here, e.g., initializing pieces
+    const torrent: Torrent = new Torrent(infoHash, displayName, size, announce, announceList, urlList, info);
 
     return torrent;
 }
