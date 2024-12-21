@@ -46,14 +46,20 @@ export class Torrent {
 		fs.mkdirSync('./downloads', { recursive: true });
 		const downloadPath: string = `./downloads/${displayName}`;
 		if (fs.existsSync(downloadPath)) {
-			// Check if the file already exists
-			// Verify the hash
-			// Verify the file is not being downloaded by another process
-			// Check if the size of the file is greater than the available space on the disk
-			// If any of the above conditions are met, throw an error
-			// return State.ERROR;
-			// else, proceed with the download
-			return State.RESUME;
+
+			// if the folder is empty, this is a new download
+			const files = fs.readdirSync(downloadPath);
+			if (files.length === 0) {
+				return State.INITIALIZING;
+			} else {
+				// Verify the hash
+				// Verify the file is not being downloaded by another process
+				// Check if the size of the file is greater than the available space on the disk
+				// If any of the above conditions are met, throw an error
+				// return State.ERROR;
+				// else, proceed with the download
+				return State.RESUME;
+			}
 		} else {
 			// Create a new file
 			fs.writeFileSync(downloadPath, '');
