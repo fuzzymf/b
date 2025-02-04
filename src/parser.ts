@@ -1,6 +1,7 @@
 import { Torrent } from './torrent.js';
 import { Bencode } from './bencode.js';
-import axios from 'axios';
+import { Peer } from './peer.js';
+import crypto from 'crypto';
 
 import { getPeersFromDHT, getPeersFromUDPTracker, getPeersFromHTTPTracker } from './peer.js';
 
@@ -72,19 +73,20 @@ export async function parseMagnetLink(sourcelink: string): Promise<Torrent> {
     const torrent: Torrent = new Torrent(infoHash, displayName || "Unknown", size, announce, announceList, urlList);
 
     // Try to get peers from announce list(trackers)
-    let peers: string[] = [];
+    let peers: Peer[] = [];
+    let peerlist: String[] = [];
     for (const tracker of announceList) {
         try {
             // check if the tracker is a valid HTTP URL or UDP URL
             if (tracker.startsWith("http://") || tracker.startsWith("https://")) {
                 // Implement HTTP tracker protocol
                 const httpPeers = await getPeersFromHTTPTracker(tracker, infoHash);
-                peers.push(...httpPeers);
+                peerlist.push(...httpPeers);;
             } else if (tracker.startsWith("udp://")) {
                 console.log("UDP tracker found:", tracker);
                 // Implement UDP tracker protocol
                 const udpPeers = await getPeersFromUDPTracker(tracker, infoHash);
-                peers.push(...udpPeers);
+                peerlist.push(...udpPeers);
             } else {
                 throw new Error("Invalid tracker URL");
             }
@@ -97,11 +99,29 @@ export async function parseMagnetLink(sourcelink: string): Promise<Torrent> {
     // If no peers found via trackers, fallback to DHT
     if (peers.length === 0) {
         console.log("No peers found via trackers. Falling back to DHT...");
-        peers = await getPeersFromDHT(infoHash);
+        peerlist = await getPeersFromDHT(infoHash);
     }
 
     console.log("Discovered Peers:", peers);
+
+    peers = peerlist.map((peerStr) => {
+        const [address, portStr] = peerStr.split(':');
+        const port = parseInt(portStr, 10);
+
+        // Provide sensible defaults for now:
+        const id = generateTemporaryPeerID();
+        const availablePieces: number[] = [];
+        const estimatedSpeed = 0;
+
+        return new Peer(id, address, port, availablePieces, estimatedSpeed);
+    });
+
+    torrent.peers = peers;
     return torrent;
+}
+
+function generateTemporaryPeerID(): string {
+    return crypto.randomBytes(4).toString('hex'); // or a more formal approach
 }
 
 /**

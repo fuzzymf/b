@@ -17,6 +17,7 @@ export class Torrent {
 	public readonly displayName: string;
 	public readonly trackers?: string[];
 	public readonly urlList?: string[];
+	public peers: Peer[];
 	public readonly announce?: string;
 	public readonly announceList?: string[][];
 	public readonly size?: number;
