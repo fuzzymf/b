@@ -1,5 +1,8 @@
 import { Torrent } from './torrent.js';
 import { Bencode } from './bencode.js';
+import axios from 'axios';
+
+import { getPeersFromDHT, getPeersFromUDPTracker, getPeersFromHTTPTracker } from './peer.js';
 
 /**
  * A regex-based magnet link parser that 
@@ -9,7 +12,7 @@ import { Bencode } from './bencode.js';
  * @throws An error if the magnet link is invalid.
 **/
 
-export function parseMagnetLink(sourcelink: string): Torrent {
+export async function parseMagnetLink(sourcelink: string): Promise<Torrent> {
     // Extract the info hash from the magnet link
     // A unique identifier for the torrent
     const xtMatch = sourcelink.match(/xt=urn:btih:([a-fA-F0-9]{40})/);
@@ -55,11 +58,8 @@ export function parseMagnetLink(sourcelink: string): Torrent {
         = sourcelink.match(/ws=([^&]+)/);
     const urlList: string[] = urlListMatch ? [decodeURIComponent(urlListMatch[1])] : [];
 
-
-    // Get the metadata from the magnet link
     // Use DHT to find peers if no tracker is available and
     // Create a info dictionary with the extracted information
-    // TODO
 
     // Create a new Torrent object with the extracted information
 
@@ -71,12 +71,41 @@ export function parseMagnetLink(sourcelink: string): Torrent {
     console.log("urlList: ", urlList);
     const torrent: Torrent = new Torrent(infoHash, displayName || "Unknown", size, announce, announceList, urlList);
 
-    // torrent.initializePieces(metadata.info);
+    // Try to get peers from announce list(trackers)
+    let peers: string[] = [];
+    for (const tracker of announceList) {
+        try {
+            // check if the tracker is a valid HTTP URL or UDP URL
+            if (tracker.startsWith("http://") || tracker.startsWith("https://")) {
+                // Implement HTTP tracker protocol
+                const httpPeers = await getPeersFromHTTPTracker(tracker, infoHash);
+                peers.push(...httpPeers);
+            } else if (tracker.startsWith("udp://")) {
+                console.log("UDP tracker found:", tracker);
+                // Implement UDP tracker protocol
+                const udpPeers = await getPeersFromUDPTracker(tracker, infoHash);
+                peers.push(...udpPeers);
+            } else {
+                throw new Error("Invalid tracker URL");
+            }
+
+        } catch (error) {
+            console.error(`Error getting peers from tracker: ${tracker}:`, error);
+            continue;
+        }
+    }
+    // If no peers found via trackers, fallback to DHT
+    if (peers.length === 0) {
+        console.log("No peers found via trackers. Falling back to DHT...");
+        peers = await getPeersFromDHT(infoHash);
+    }
+
+    console.log("Discovered Peers:", peers);
     return torrent;
 }
 
 /**
- * A bencode parser that
+ * A parser that
  * parses a torrent file and returns a Torrent object.
  * @param rawData The raw data parsed as a string.
  * @returns The Torrent object.

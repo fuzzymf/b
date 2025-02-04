@@ -16,8 +16,8 @@ const arg: string = process.argv[2];
 
 switch (arg) {
 	case '-h':
-		console.info('Usage: bee -- -t [torrent file path]');
-		console.info('Usage: bee -- -m [magnet link]');
+		console.info('Usage: bee -t [torrent file path]');
+		console.info('Usage: bee -m [magnet link]');
 		break;
 	case '-v':
 		console.log('Version: 0.0.1');
@@ -25,21 +25,24 @@ switch (arg) {
 	// Handle magnet link
 	case '-m':
 		try {
+			if (process.argv[3] === undefined) throw new Error('No magnet link provided');
+			// Extract the magnet link
+
 			const link: string = process.argv[3];
 			if (link.startsWith('magnet')) {
 				// Decode the magnet link
 				// Create a new Torrent object with the extracted information
-				const torrent: Torrent = parseMagnetLink(link);
+				const torrent: Torrent = await parseMagnetLink(link);
 				// Initialize pieces based on the torrent metadata
 				// This will be done dynamically for magnet links
 				// Pieces are parts of the file(s) that are downloaded
 				torrent.initializePieces();
 
 				// Pre-processing function 
-				const state: State = torrent.initializeDownload(torrent);
+				// const state: State = torrent.initializeDownload(torrent);
 
 				// Download the torrent
-				await torrent.download(torrent, state);
+				// await torrent.download(torrent, state);
 			}
 			else throw new Error('Invalid magnet link provided');
 			break;
@@ -77,6 +80,6 @@ switch (arg) {
 		}
 	default:
 		console.log('Invalid argument provided\n');
-		console.log('Usage: npm run bdown -- -t [torrent file path]\n OR \nUsage: node src/index.js -- -m [magnet link]');
+		console.log('Usage: npm run bdown -t [torrent file path]\n OR \nUsage: node src/index.js -m [magnet link]');
 		break;
 }
